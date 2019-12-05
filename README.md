@@ -1,5 +1,5 @@
 # duo
-Dual osc module.
+Dual osc module for detune sound!
 
 # Parameters
 - Shape (NTS-1: A, other: Shape)  
