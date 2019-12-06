@@ -3,7 +3,7 @@ Dual osc module for detune sound!
 
 # Parameters
 - shape (NTS-1: A, other: Shape)  
-Detuen of SubOsc.
+Detune of SubOsc.
 - shiftshape (NTS-1: B, other: Shift+Shape)  
 Main/Sub volume of of SubOsc.
 - parameter 1  
