@@ -10,7 +10,7 @@ OSC2 mixing ratio.
 - parameter 1  
 Wave Type (1: Tri, 2: Pulse, 3: Saw)
 - parameter 2  
-Note offset of OSC2 (-24 - 24)
+Note offset of OSC2 (1 - 49) as (-24 - +24)
 
 # How to build
 1. Clone (or download) and setup [logue-sdk](https://github.com/korginc/logue-sdk).
