@@ -6,11 +6,12 @@ This software is released under the MIT License, see LICENSE.txt.
 #include "LCWPitchTable.h"
 
 #define LCW_PRE_LEFT_SHIFT (8)
+#define LCW_RESO_PER_OCTAVE (12 * 16)
 
 // u4.28
 // Size: 12 * 16 + 1 = 193 // 半音あたり16分割 + 1
 // delta = (440 << PRE_SHIFT) * 2^([0-192] / 192) / 48000.0
-static uint32_t deltaTable[] = {
+static uint32_t deltaTable[LCW_RESO_PER_OCTAVE + 1] = {
     0x258BF259, // [  0] 1.000000,  2.3467
     0x25AEB5BA, // [  1] 1.003617,  2.3552
     0x25D1994B, // [  2] 1.007246,  2.3637
@@ -210,21 +211,24 @@ uint32_t pitch_to_timer_delta(int32_t pitch)
 {
   int32_t octave = (pitch >> 16) - LCW_PRE_LEFT_SHIFT;
 
+  // u16.16
+  uint32_t frac = (uint32_t)pitch & 0xFFFF;
+  uint32_t tmp = LCW_RESO_PER_OCTAVE * frac;
+
 #if (1)
   // Look up only Ver.
-  uint32_t delta = deltaTable[((pitch & 0xFFFF) * 12) >> 12];
+  // 0.5相当の値を足してから整数部でLook up（= 四捨五入）
+  uint32_t delta = deltaTable[(tmp + 0x8000) >> 16];
 #else
   // Linear interpolation Ver.
-  // あとで線形補間するのに4bit残しておく
-  int32_t tmp = ((pitch & 0xFFFF) * 12) >> 8; 
-  int32_t i = tmp >> 4;
+  uint32_t i = tmp >> 16;
   uint32_t delta = deltaTable[i];
   // 4bit分の線形補間
   uint32_t diff = deltaTable[i+1] - delta;
-  delta += ( (diff >> 4) * (tmp & 0xF) );
+  delta += ( (diff >> 4) * ((tmp & 0xFFFF) >> 12) );
 #endif
+
   if ( octave < 0 ) {
-    // memo: 四捨五入しても良いかも
     return delta >> -octave;
   }
   else {
