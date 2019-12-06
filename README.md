@@ -1,13 +1,16 @@
 # duo
 Dual osc module for detune sound!
+For Detune, please reset `parameter 2` to 25.
 
 # Parameters
 - shape (NTS-1: A, other: Shape)  
 Detune of SubOsc.
 - shiftshape (NTS-1: B, other: Shift+Shape)  
-Main/Sub volume of of SubOsc.
+OSC2 mixing ratio.
 - parameter 1  
 Wave Type (1: Tri, 2: Pulse, 3: Saw)
+- parameter 2
+Note offset of OSC2 (-24 - 24)
 
 # How to build
 1. Clone (or download) and setup [logue-sdk](https://github.com/korginc/logue-sdk).

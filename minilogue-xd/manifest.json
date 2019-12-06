@@ -6,11 +6,12 @@
         "api" : "1.1-0",
         "dev_id" : 0,
         "prg_id" : 0,
-        "version" : "0.9-0",
+        "version" : "0.9-2",
         "name" : "duo",
-        "num_param" : 1,
+        "num_param" : 2,
         "params" : [
-            ["Wave", 0,   2,  ""]
+            ["Wave Type",   0,  2,  ""],
+            ["OSC2 Note",   0, 48,  ""]
         ]
     }
 }
