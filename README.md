@@ -1,5 +1,5 @@
 # duo
-Dual osc module for detune sound!
+Dual osc module for detune sound!  
 For Detune, please reset `parameter 2` to 25.
 
 # Parameters
@@ -9,7 +9,7 @@ Detune of SubOsc.
 OSC2 mixing ratio.
 - parameter 1  
 Wave Type (1: Tri, 2: Pulse, 3: Saw)
-- parameter 2
+- parameter 2  
 Note offset of OSC2 (-24 - 24)
 
 # How to build
