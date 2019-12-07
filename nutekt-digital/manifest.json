@@ -8,11 +8,12 @@
         "prg_id" : 0,
         "version" : "0.9-3",
         "name" : "duo",
-        "num_param" : 3,
+        "num_param" : 4,
         "params" : [
             ["Wave",   0,  2,  ""],
             ["Note",   0, 48,  ""],
-            ["DDir",   0,  1,  ""]
+            ["DDir",   0,  1,  ""],
+            ["Prta",   0, 63,  ""]
         ]
     }
 }
