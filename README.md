@@ -18,6 +18,8 @@ Note offset of OSC2 (1 .. 25 .. 49) as (-24 .. 0 .. +24)
 Detune direction. *(Not for Note offset)*  
   1. Plus
   1. Minus
+- parameter 4  
+Portament (1 .. 64)
 
 # How to build
 1. Clone (or download) and setup [logue-sdk](https://github.com/korginc/logue-sdk).
