@@ -19,8 +19,9 @@ This software is released under the MIT License, see LICENSE.txt.
 static struct {
   uint16_t shape = 0;
   uint16_t mixRatio = 0;// = shiftshape, [0 - 0x400]
-  uint16_t wave = 0;    // [0 - 2]
-  int16_t note = 0;     // [-24 - 24]
+  uint16_t wave = 0;    // [0 .. 2]
+  int16_t note = 0;     // [-24 .. +24]
+  uint16_t dir = 0;     // 0: plus, 1: minus
 } s_param;
 
 static struct {
@@ -84,8 +85,10 @@ void OSC_CYCLE(const user_osc_param_t * const params,
   int32_t pitch = (int32_t)params->pitch << 8;
   pitch = (pitch - (LCW_NOTE_NO_A4 << 16)) / 12;
 
-  int32_t detune = (int32_t)(s_param.shape << 2) + (params->shape_lfo >> (31 - 10));
+  int32_t detune = ((s_param.dir == 0) ? 1 : -1) * ((int32_t)s_param.shape << 2);
+  detune += (params->shape_lfo >> (31 - 10));
   detune += ((int32_t)s_param.note << 16) / 12;
+
   const uint32_t dt1 = pitch_to_timer_delta( pitch );
   const uint32_t dt2 = pitch_to_timer_delta( pitch + detune );
 
@@ -96,7 +99,7 @@ void OSC_CYCLE(const user_osc_param_t * const params,
   q31_t * __restrict y = (q31_t *)yn;
   const q31_t * y_e = y + frames;
 
-  // Main Mix/Sub Mix, 8bit(= [0 - 256])
+  // Main Mix/Sub Mix, 8bit(= [0-256])
   const int32_t subVol = s_param.mixRatio >> 2;
   const int32_t mainVol = 0x100 - subVol;
 
@@ -146,6 +149,9 @@ void OSC_PARAM(uint16_t index, uint16_t value)
     break;
   case k_user_osc_param_id2:
     s_param.note = (int16_t)clipmaxu32(value, 48) - 24;
+    break;
+  case k_user_osc_param_id3:
+    s_param.dir = value;
     break;
   default:
     break;
