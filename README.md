@@ -19,7 +19,7 @@ Detune direction. *(Not for Note offset)*
   1. Plus
   1. Minus
 - parameter 4  
-Portament (1 .. 64)
+Portament (1 .. 101)
 
 # How to build
 1. Clone (or download) and setup [logue-sdk](https://github.com/korginc/logue-sdk).
