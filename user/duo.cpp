@@ -202,6 +202,7 @@ void OSC_INIT(uint32_t platform, uint32_t api)
   s_state.pitch2 = (LCW_NOTE_NO_A4 << 24) / 12;
 }
 
+#define LCW_PITCH_DETUNE_RANGE ((1 << 20) / 18) // memo: 50centだと物足りない
 void OSC_CYCLE(const user_osc_param_t * const params,
                int32_t *yn,
                const uint32_t frames)
@@ -209,8 +210,9 @@ void OSC_CYCLE(const user_osc_param_t * const params,
   // s11.20に拡張してから、整数部がoctaveになるように加工
   int32_t pitch = (int32_t)params->pitch << 12;
   pitch = (pitch - (LCW_NOTE_NO_A4 << 20)) / 12;
-  int32_t detune = ((s_param.dir == 0) ? 1 : -1) * ((int32_t)s_param.shape << 6);
-  detune += (params->shape_lfo >> (31 - 14));
+  int32_t detune = ((int32_t)s_param.shape * LCW_PITCH_DETUNE_RANGE) >> 10;
+  detune *= ( s_param.dir == 0 ) ? 1 : -1;
+  detune += (params->shape_lfo >> (31 - 16));
   detune += ((int32_t)s_param.note << 20) / 12;
 
   // s11.20 -> s7.24
