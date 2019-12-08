@@ -215,7 +215,7 @@ uint32_t pitch_to_timer_delta(int32_t pitch)
   uint32_t frac = (uint32_t)pitch & 0xFFFF;
   uint32_t tmp = LCW_RESO_PER_OCTAVE * frac;
 
-#if (1)
+#if (0)
   // Look up only Ver.
   // 0.5相当の値を足してから整数部でLook up（= 四捨五入）
   uint32_t delta = deltaTable[(tmp + 0x8000) >> 16];
