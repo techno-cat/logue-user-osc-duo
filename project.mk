@@ -2,7 +2,7 @@
 # Project Customization
 # #############################################################################
 
-PROJECT = duo
+PROJECT = osc_duo
 
 UCSRC = $(wildcard ../user/lib/*.c)
 
