@@ -123,11 +123,10 @@ static const int32_t portaTable[LCW_PORTA_TABLE_SIZE] = {
 };
 
 static struct {
-  uint16_t shape = 0;
-  uint16_t mixRatio = 0;  // = shiftshape, [0 - 0x400]
+  int16_t shape = 0;     // = shape, [-0x400 .. +0x400]
+  uint16_t mixRatio = 0;  // = shiftshape, [0 .. 0x400]
   uint16_t wave = 0;      // [0 .. 2]
   int16_t note = 0;       // [-24 .. +24]
-  uint16_t dir = 0;       // 0: plus, 1: minus
   uint16_t portament = 0; // [0 .. 100]
 } s_param;
 
@@ -136,6 +135,7 @@ static struct {
   uint32_t timer2 = 0;
   int32_t pitch1 = 0;   // s7.24
   int32_t pitch2 = 0;   // s7.24
+  int32_t shape_lfo = 0;
 } s_state;
 
 static const LCWOscWaveSource *s_waveSources[] = {
@@ -143,6 +143,14 @@ static const LCWOscWaveSource *s_waveSources[] = {
   &gLcwOscPulseSource,
   &gLcwOscSawSource
 };
+
+// return s5.10
+__fast_inline int16_t param_val_to_q10(uint16_t val)
+{
+  float valf = param_val_to_f32(val);
+  valf = (valf <= 0.49f) ? 1.02040816326530612244f * valf : (valf >= 0.51f) ? 0.5f + 1.02f * (valf-0.51f) : 0.5f;
+  return (int16_t)(0x800 * clip01f(valf)) - 0x400;
+}
 
 // return s15.16
 __fast_inline int32_t myLookUp(
@@ -190,6 +198,19 @@ __fast_inline void convergePitch(
   }
 }
 
+// limit : equal or more than 1.f
+__fast_inline float softlimiter(float c, float x, float limit)
+{
+  float th = limit - 1.f + c;
+  float xf = si_fabsf(x);
+  if ( xf < th ) {
+    return x;
+  }
+  else {
+    return si_copysignf( th + osc_softclipf(c, xf - th), x );
+  }
+}
+
 void OSC_INIT(uint32_t platform, uint32_t api)
 {
   s_param.shape = 0;
@@ -200,6 +221,7 @@ void OSC_INIT(uint32_t platform, uint32_t api)
   s_state.timer2 = 0;
   s_state.pitch1 =
   s_state.pitch2 = (LCW_NOTE_NO_A4 << 24) / 12;
+  s_state.shape_lfo = 0;
 }
 
 #define LCW_PITCH_DETUNE_RANGE ((1 << 20) / 18) // memo: 50centだと物足りない
@@ -211,9 +233,9 @@ void OSC_CYCLE(const user_osc_param_t * const params,
   int32_t pitch = (int32_t)params->pitch << 12;
   pitch = (pitch - (LCW_NOTE_NO_A4 << 20)) / 12;
   int32_t detune = ((int32_t)s_param.shape * LCW_PITCH_DETUNE_RANGE) >> 10;
-  detune *= ( s_param.dir == 0 ) ? 1 : -1;
-  detune += (params->shape_lfo >> (31 - 16));
   detune += ((int32_t)s_param.note << 20) / 12;
+
+  int32_t lfo_delta = (params->shape_lfo - s_state.shape_lfo) / (int32_t)frames;
 
   // s11.20 -> s7.24
   pitch <<= 4;
@@ -224,13 +246,14 @@ void OSC_CYCLE(const user_osc_param_t * const params,
   uint32_t t2 = s_state.timer2;
   int32_t pitch1 = s_state.pitch1;
   int32_t pitch2 = s_state.pitch2;
+  int32_t shape_lfo = s_state.shape_lfo;
 
   q31_t * __restrict y = (q31_t *)yn;
   const q31_t * y_e = y + frames;
 
   // Main Mix/Sub Mix, 8bit(= [0-256])
   const int32_t subVol = s_param.mixRatio >> 2;
-  const int32_t mainVol = 0x100 - subVol;
+  const int32_t mainVol = 0x100 - clipmini32(0, subVol - 0xC0);
 
   const int32_t portaParam = portaTable[s_param.portament];
   const LCWOscWaveSource *src = s_waveSources[s_param.wave];  
@@ -241,7 +264,7 @@ void OSC_CYCLE(const user_osc_param_t * const params,
 
     // input: s7.24 -> s15.16
     const uint32_t dt1 = pitch_to_timer_delta( pitch1 >> 8 );
-    const uint32_t dt2 = pitch_to_timer_delta( pitch2 >> 8 );
+    const uint32_t dt2 = pitch_to_timer_delta( (pitch2 + (shape_lfo >> 8)) >> 8 );
 
     // s15.16 -> s11.20
     // x 0.9375(= 15/16)
@@ -249,20 +272,22 @@ void OSC_CYCLE(const user_osc_param_t * const params,
     int32_t out2 = myLookUp(t2, dt2, src) * 15;
 
     // s11.20 -> s3.28
-    int32_t out = (out1 * mainVol) + (out2 * subVol);
-    out = clipminmaxi32( -0x10000000, out, 0x10000000 );
+    float out = ((out1 * mainVol) + (out2 * subVol)) / (float)(1 << 28);
+    out = softlimiter( 0.1f, out, 1.f );
 
-    // q28 -> q31
-    *(y++) = out << (31 - 28);
+    // float -> q31
+    *(y++) = (q31_t)(out * (1 << 31));
 
     t1 = (t1 + dt1) & LCW_OSC_TIMER_MASK;
     t2 = (t2 + dt2) & LCW_OSC_TIMER_MASK;
+    shape_lfo += lfo_delta;
   }
 
   s_state.timer1 = t1;
   s_state.timer2 = t2;
   s_state.pitch1 = pitch1;
   s_state.pitch2 = pitch2;
+  s_state.shape_lfo = params->shape_lfo;
 }
 
 void OSC_NOTEON(const user_osc_param_t * const params)
@@ -279,7 +304,7 @@ void OSC_PARAM(uint16_t index, uint16_t value)
 {
   switch (index) {
   case k_user_osc_param_shape:
-    s_param.shape = value;
+    s_param.shape = param_val_to_q10(value);
     break;
   case k_user_osc_param_shiftshape:
     s_param.mixRatio = (uint16_t)clipmaxu32(value, 0x400);
@@ -291,9 +316,6 @@ void OSC_PARAM(uint16_t index, uint16_t value)
     s_param.note = (int16_t)clipmaxu32(value, 48) - 24;
     break;
   case k_user_osc_param_id3:
-    s_param.dir = value;
-    break;
-  case k_user_osc_param_id4:
     s_param.portament = (uint16_t)clipmaxu32(value, LCW_PORTA_TABLE_SIZE - 1);
     break;
   default:

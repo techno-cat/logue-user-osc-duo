@@ -8,11 +8,10 @@
         "prg_id" : 0,
         "version" : "0.9-4",
         "name" : "duo",
-        "num_param" : 4,
+        "num_param" : 3,
         "params" : [
             ["Wave Type",   0,  2,  ""],
             ["OSC2 Note",   0, 48,  ""],
-            ["Detune Dir",  0,  1,  ""],
             ["Portament",   0,100,  ""]
         ]
     }
