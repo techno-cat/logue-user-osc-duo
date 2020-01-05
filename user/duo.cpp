@@ -7,6 +7,7 @@ This software is released under the MIT License, see LICENSE.txt.
 #include "LCWPitchTable.h"
 #include "LCWAntiAliasingTable.h"
 #include "LCWOscWaveSource.h"
+#include "LCWClipCurveTable.h"
 
 #define LCW_OSC_TIMER_BITS (LCW_PITCH_DELTA_VALUE_BITS)
 #define LCW_OSC_TIMER_MAX (1 << LCW_OSC_TIMER_BITS)
@@ -198,17 +199,26 @@ __fast_inline void convergePitch(
   }
 }
 
-// limit : equal or more than 1.f
-__fast_inline float softlimiter(float c, float x, float limit)
+// in/return : s7.24
+__fast_inline int32_t lookupClipCurve(int32_t x)
 {
-  float th = limit - 1.f + c;
-  float xf = si_fabsf(x);
-  if ( xf < th ) {
-    return x;
+  const int32_t x2 = ( x < 0 ) ? -x : x;
+  const int32_t i = x2 >> (LCW_CLIP_CURVE_VALUE_BITS - LCW_CLIP_CURVE_FRAC_BITS);
+
+  int32_t ret;
+  if ( i < (LCW_CLIP_CURVE_TABLE_SIZE - 1) ) {
+    const uint32_t frac = (uint32_t)x2 & (0x00FFFFFF >> LCW_CLIP_CURVE_VALUE_BITS);
+    const int32_t val = gLcwClipCurveTable[i];
+    const int32_t diff = gLcwClipCurveTable[i+1] - val;
+    const int64_t tmp = (int64_t)frac * diff;
+
+    ret = val + (tmp >> (LCW_CLIP_CURVE_VALUE_BITS - LCW_CLIP_CURVE_FRAC_BITS));
   }
   else {
-    return si_copysignf( th + osc_softclipf(c, xf - th), x );
+    ret = gLcwClipCurveTable[LCW_CLIP_CURVE_TABLE_SIZE - 1];
   }
+
+  return ( x < 0 ) ? -ret : ret;
 }
 
 void OSC_INIT(uint32_t platform, uint32_t api)
@@ -253,7 +263,7 @@ void OSC_CYCLE(const user_osc_param_t * const params,
 
   // Main Mix/Sub Mix, 8bit(= [0-256])
   const int32_t subVol = s_param.mixRatio >> 2;
-  const int32_t mainVol = 0x100 - clipmini32(0, subVol - 0xC0);
+  const int32_t mainVol = clipmaxi32( 0x160 - subVol, 0x100 );
 
   const int32_t portaParam = portaTable[s_param.portament];
   const LCWOscWaveSource *src = s_waveSources[s_param.wave];  
@@ -271,12 +281,12 @@ void OSC_CYCLE(const user_osc_param_t * const params,
     int32_t out1 = myLookUp(t1, dt1, src) * 15;
     int32_t out2 = myLookUp(t2, dt2, src) * 15;
 
-    // s11.20 -> s3.28
-    float out = ((out1 * mainVol) + (out2 * subVol)) / (float)(1 << 28);
-    out = softlimiter( 0.1f, out, 1.f );
+    // s11.20 -> s3.28 -> s7.24
+    int32_t out = (out1 * mainVol) + (out2 * subVol);
+    out = lookupClipCurve( out >> 4 );
 
-    // float -> q31
-    *(y++) = (q31_t)(out * (1 << 31));
+    // s7.24 -> q31
+    *(y++) = (q31_t)(out << (31 - 24));
 
     t1 = (t1 + dt1) & LCW_OSC_TIMER_MASK;
     t2 = (t2 + dt2) & LCW_OSC_TIMER_MASK;
